@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
   //Remove the trailing
       input[strlen(input) - 1] = '\0' ;
 
-      
+
   //strcompare
    if (strcmp(input, "exit") == 0) {
       break;
@@ -25,5 +25,5 @@ int main(int argc, char *argv[]) {
 
 
   }
-  return 1;
+  return 0;
 }
