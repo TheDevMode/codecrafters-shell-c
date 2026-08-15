@@ -11,18 +11,18 @@ int main(int argc, char *argv[]) {
     printf("$ ");
     char input[100];
     fgets(input, 100, stdin);
+
+
+   //Remove the trailing
+    input[strlen(input) - 1] = '\0' ;
   
-    //strcompare
+  //strcompare
    if (strcmp(input, "exit") == 0) {
       break;
   }
-  
 
-   //Remove the trailing
-      input[strlen(input) - 1] = '\0' ;
       printf("%s: command not found\n", input);
-  
-  
+
 
   }
   return 0;
