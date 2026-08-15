@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
 
   //strcompare
   if (strcmp(input, "exit") == 0) {
-    break;
+      break;
   }
 
   }
