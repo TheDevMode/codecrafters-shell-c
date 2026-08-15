@@ -17,10 +17,10 @@ int main(int argc, char *argv[]) {
       printf("%s: command not found\n", input);
 
   //strcompare
-  if strcmp(input, "exit" == 0) {
+  if (strcmp(input, "exit" == 0)) {
     break;
   }
-  
+
   }
   return 1;
 }
