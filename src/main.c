@@ -16,6 +16,11 @@ int main(int argc, char *argv[]) {
       input[strlen(input) - 1] = '\0' ;
       printf("%s: command not found\n", input);
 
+  //strcompare
+  if strcmp(input, "exit" == 0) {
+    break;
+  }
+  
   }
   return 1;
 }
