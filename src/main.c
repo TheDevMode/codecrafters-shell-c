@@ -7,8 +7,7 @@ int main(int argc, char *argv[]) {
     setbuf(stdout, NULL);
 
   // TODO: Uncomment the code below to pass the first stage
-  while (1)
-  {
+  while (1) {
     printf("$ ");
     char input[100];
     fgets(input, 100, stdin);
