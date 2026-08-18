@@ -22,13 +22,13 @@ int main(int argc, char *argv[]) {
       printf("%s\n", input + 5);
     }
     else if (strncmp(input ,"type " , 5) == 0) {
-      if (strcmp(input ,"exit") == 0) {
+      if (strcmp(input + 5 ,"exit") == 0) {
         printf("exit is a shell builtin\n");
       }
-      else if (strcmp(input ,"echo") == 0) {
+      else if (strcmp(input + 5 ,"echo") == 0) {
         printf("echo is a shell builtin\n");
       }
-      else if(strcmp(input ,"type") == 0) {
+      else if(strcmp(input + 5 ,"type") == 0) {
         printf("type is a shell builtin\n");
       }
       else {
