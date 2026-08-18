@@ -7,6 +7,7 @@ int main(int argc, char *argv[]) {
   // Flush after every printf
     setbuf(stdout, NULL);
 
+  char saved_path[512];
   char *env_path = getenv("PATH");
 
   // TODO: Uncomment the code below to pass the first stage
@@ -36,7 +37,10 @@ int main(int argc, char *argv[]) {
       }
       else {
       int found = 0;
-        for (char *path = strtok(env_path, ":"); path != NULL; path = strtok(NULL, ":")) {
+      if (env_path != NULL) {
+        strncpy(saved_path, env_path, sizeof(saved_path) - 1);
+      }
+        for (char *path = strtok(saved_path, ":"); path != NULL; path = strtok(NULL, ":")) {
           char full_path[512];
           snprintf(full_path, sizeof(full_path), "%s/%s", path, input + 5);
           if (access(full_path, X_OK) == 0) {
