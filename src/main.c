@@ -35,16 +35,20 @@ int main(int argc, char *argv[]) {
         printf("type is a shell builtin\n");
       }
       else {
+      int found = 0;
         for (char *path = strtok(env_path, ":"); path != NULL; path = strtok(NULL, ":")) {
           char full_path[512];
           snprintf(full_path, sizeof(full_path), "%s/%s", path, input + 5);
           if (access(full_path, X_OK) == 0) {
             printf("%s is %s\n", input + 5, full_path);
+            found += 1;
             break;
           }
         }
+        if (found != 1) {
         printf("%s not found\n", input + 5);
       }
+    }
     }
      else {
       printf("%s: command not found\n", input);
