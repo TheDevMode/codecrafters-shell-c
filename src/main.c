@@ -1,10 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 int main(int argc, char *argv[]) {
   // Flush after every printf
     setbuf(stdout, NULL);
+
+  char *env_path = getenv("PATH");
 
   // TODO: Uncomment the code below to pass the first stage
   while (1) {
@@ -32,7 +35,15 @@ int main(int argc, char *argv[]) {
         printf("type is a shell builtin\n");
       }
       else {
-        printf("%s: not found\n", input + 5);
+        for (char *path = strtok(env_path, ":"); path != NULL; path = strtok(NULL, ":")) {
+          char full_path[512];
+          snprintf(full_path, sizeof(full_path), "%s/%s", path, input + 5);
+          if (access(full_path, X_OK) == 0) {
+            printf("%s is %s\n", input + 5, full_path);
+            return;
+          }
+        }
+        printf("%s not found\n", input + 5);
       }
     }
      else {
