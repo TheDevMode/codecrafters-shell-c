@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
           snprintf(full_path, sizeof(full_path), "%s/%s", path, input + 5);
           if (access(full_path, X_OK) == 0) {
             printf("%s is %s\n", input + 5, full_path);
-            return;
+            break;
           }
         }
         printf("%s not found\n", input + 5);
