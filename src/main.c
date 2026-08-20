@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
 
 int main(int argc, char *argv[]) {
   // Flush after every printf
@@ -55,7 +56,32 @@ int main(int argc, char *argv[]) {
     }
     }
      else {
-      printf("%s: command not found\n", input);
+      char *argv[64];
+      int argc = 0;
+      char input_copy[100];
+      strncpy(input_copy, input, sizeof(input_copy) - 1);
+
+      char *slice = strtok(input_copy, " ");
+      while (slice != NULL  && argc < 63) {
+        argv[argc++] = slice;
+        slice = strtok(NULL, " ");
+      }
+      argv[argc] = NULL;
+
+      if (argc > 0) {
+        
+        pid_t pid = fork();
+        if (pid == 0) {
+          execvp(argv[0], argv);
+          printf("%s: command not found\n", argv[0]);
+          exit(EXIT_FAILURE);
+        } else if (pid > 0) {
+          wait(NULL);
+        } else {
+          perror("fork");
+          exit(EXIT_FAILURE);
+        }
+      }
     }
   }
 
