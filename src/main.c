@@ -81,6 +81,8 @@ int main(int argc, char *argv[]) {
           perror("fork");
           exit(EXIT_FAILURE);
         }
+      } else {
+      printf("%s: command not found\n", input);
       }
     }
   }
