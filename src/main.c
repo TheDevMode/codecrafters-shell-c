@@ -27,12 +27,24 @@ int main(int argc, char *argv[]) {
     } else if (strncmp(input, "echo ", 5) == 0) {
       printf("%s\n", input + 5);
     }
+    else if (strcmp(input, "pwd") == 0) {
+      char cwd[512];
+      if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        printf("%s\n", cwd);
+      } else {
+        perror("getcwd");
+      }
+    }
     else if (strncmp(input ,"type " , 5) == 0) {
       if (strcmp(input + 5 ,"exit") == 0) {
         printf("exit is a shell builtin\n");
       }
       else if (strcmp(input + 5 ,"echo") == 0) {
         printf("echo is a shell builtin\n");
+      }
+      else if (strcmp(input + 5, "pwd") == 0) {
+        printf("pwd is a shell builtin\n");
+
       }
       else if(strcmp(input + 5 ,"type") == 0) {
         printf("type is a shell builtin\n");
