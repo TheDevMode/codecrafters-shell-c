@@ -40,6 +40,9 @@ int main(int argc, char *argv[]) {
         printf("cd: %s: No such file or directory\n", input + 3);
       if (strcmp(input + 3, "~") == 0) {
         chdir(input + 3);
+        if (input + 3 == NULL) {
+          printf("cd: HOME not set\n");
+        }
       }
     }
     else if (strncmp(input ,"type " , 5) == 0) {
