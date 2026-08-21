@@ -22,11 +22,14 @@ int main(int argc, char *argv[]) {
     input[strlen(input) - 1] = '\0';
 
     // Compare input commands
+    //exit
     if (strcmp(input, "exit") == 0) {
       break;
+    //echo
     } else if (strncmp(input, "echo ", 5) == 0) {
       printf("%s\n", input + 5);
     }
+    //pwd
     else if (strcmp(input, "pwd") == 0) {
       char cwd[512];
       if (getcwd(cwd, sizeof(cwd)) != NULL) {
@@ -35,15 +38,17 @@ int main(int argc, char *argv[]) {
         printf("getcwd error");
       }
     }
+    //cd
     else if (strncmp(input, "cd ", 3) == 0) {
-      if (chdir(input + 3) != 0) {
+      const char *directory = input + 3;
+      if (strcmp(directory, "~") == 0) {
+        directory = getenv("HOME");
+      }
+      if (directory == NULL || chdir(directory) != 0) {
         printf("cd: %s: No such file or directory\n", input + 3);
       }
-      if (strcmp(input + 3, "~") == 0) {
-        input + 3 = getenv("HOME");
-        chdir(input + 3);
-      }
     }
+    //type
     else if (strncmp(input ,"type " , 5) == 0) {
       if (strcmp(input + 5 ,"exit") == 0) {
         printf("exit is a shell builtin\n");
@@ -61,6 +66,7 @@ int main(int argc, char *argv[]) {
         printf("type is a shell builtin\n");
       }
       else {
+        // Search for the command in the PATH
       int found = 0;
       if (env_path != NULL) {
         strncpy(saved_path, env_path, sizeof(saved_path) - 1);
@@ -80,6 +86,7 @@ int main(int argc, char *argv[]) {
     }
     }
      else {
+      // Split the input into arguments
       char *argv[64];
       int argc = 0;
       char input_copy[100];
@@ -93,7 +100,7 @@ int main(int argc, char *argv[]) {
       argv[argc] = NULL;
 
       if (argc > 0) {
-        
+        // Execute the command using execvp
         pid_t pid = fork();
         if (pid == 0) {
           execvp(argv[0], argv);
