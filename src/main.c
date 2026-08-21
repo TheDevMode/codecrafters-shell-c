@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
       if (chdir(input + 3) != 0) {
         printf("cd: %s: No such file or directory\n", input + 3);
       if (strcmp(input + 3, "~") == 0) {
-        chdir(getenv("HOME"));
+        chdir(input + 3);
       }
     }
     else if (strncmp(input ,"type " , 5) == 0) {
