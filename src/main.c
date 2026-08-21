@@ -32,7 +32,12 @@ int main(int argc, char *argv[]) {
       if (getcwd(cwd, sizeof(cwd)) != NULL) {
         printf("%s\n", cwd);
       } else {
-        perror("getcwd");
+        printf("getcwd error");
+      }
+    }
+    else if (strncmp(input, "cd ", 3) == 0) {
+      if (chdir(input + 3) != 0) {
+        printf("cd %s: directory not found\n", input + 3);
       }
     }
     else if (strncmp(input ,"type " , 5) == 0) {
@@ -44,7 +49,9 @@ int main(int argc, char *argv[]) {
       }
       else if (strcmp(input + 5, "pwd") == 0) {
         printf("pwd is a shell builtin\n");
-
+      }
+      else if (strcmp(input + 5, "cd") == 0) {
+        printf("cd is a shell builtin\n");
       }
       else if(strcmp(input + 5 ,"type") == 0) {
         printf("type is a shell builtin\n");
