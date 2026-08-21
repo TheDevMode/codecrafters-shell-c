@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
     }
     else if (strncmp(input, "cd ", 3) == 0) {
       if (chdir(input + 3) != 0) {
-        printf("cd %s: directory not found\n", input + 3);
+        printf("cd %s: No such file or directory\n", input + 3);
       }
     }
     else if (strncmp(input ,"type " , 5) == 0) {
