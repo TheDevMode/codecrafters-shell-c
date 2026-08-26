@@ -30,9 +30,10 @@ int main(int argc, char *argv[]) {
 
 // 1. Loop until reaching the null terminator '\0' instead of calling strlen()
   for (int i = 0; input[i] != '\0'; i++) {
-      if (input[i] == '"') {
-          in_quotes = !in_quotes;
-      } 
+      if (input[i] == '\'') {
+    // Toggle quote flag without adding '\'' to the argument string
+    in_quotes = !in_quotes;
+      }
       else if (input[i] == ' ' && !in_quotes) {
           if (buffer_index > 0) {
               buffer[buffer_index] = '\0';
