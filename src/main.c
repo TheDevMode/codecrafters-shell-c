@@ -67,8 +67,12 @@ int main(int argc, char *argv[]) {
     if (strcmp(input, "exit") == 0) {
       break;
     //echo
-    } else if (strncmp(input, "echo ", 5) == 0) {
-      printf("%s\n", input + 5);
+    // echo
+    } else if (strcmp(argv[0], "echo") == 0) {
+    for (int i = 1; i < argc; i++) {
+        printf("%s%s", argv[i], (i == argc - 1) ? "" : " ");
+    }
+    printf("\n");
     }
 
     //pwd
