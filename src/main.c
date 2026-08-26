@@ -21,6 +21,32 @@ int main(int argc, char *argv[]) {
     // Remove the trailing newline
     input[strlen(input) - 1] = '\0';
 
+    char *argv[64];
+    int argc = 0;
+
+    char buffer[100];
+    int buffer_index = 0;
+    int in_quotes = 0;
+
+    for(int i = 0; i < strlen(input); i++) {
+      if (input[i] == '"') {
+        in_quotes = !in_quotes;
+      } else if (input[i] == ' ' && !in_quotes) {
+        if (buffer_index > 0) {
+          buffer[buffer_index] = '\0';
+          argv[argc++] = strdup(buffer);
+          buffer_index = 0;
+        }
+      } else {
+        buffer[buffer_index++] = input[i];
+      }
+    }
+    if (buffer_index > 0) {
+      buffer[buffer_index] = '\0';
+      argv[argc++] = strdup(buffer);
+    }
+    argv[argc] = NULL;
+
     // Compare input commands
     //exit
     if (strcmp(input, "exit") == 0) {
@@ -29,6 +55,7 @@ int main(int argc, char *argv[]) {
     } else if (strncmp(input, "echo ", 5) == 0) {
       printf("%s\n", input + 5);
     }
+
     //pwd
     else if (strcmp(input, "pwd") == 0) {
       char cwd[512];
@@ -120,3 +147,4 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
+
