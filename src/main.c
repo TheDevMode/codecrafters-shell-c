@@ -21,31 +21,45 @@ int main(int argc, char *argv[]) {
     // Remove the trailing newline
     input[strlen(input) - 1] = '\0';
 
-    char *argv[64];
-    int argc = 0;
+  char *argv[64];
+  int argc = 0;
 
-    char buffer[100];
-    int buffer_index = 0;
-    int in_quotes = 0;
+  char buffer[100];
+  int buffer_index = 0;
+  int in_quotes = 0;
 
-    for(int i = 0; i < strlen(input); i++) {
+// 1. Loop until reaching the null terminator '\0' instead of calling strlen()
+  for (int i = 0; input[i] != '\0'; i++) {
       if (input[i] == '"') {
-        in_quotes = !in_quotes;
-      } else if (input[i] == ' ' && !in_quotes) {
-        if (buffer_index > 0) {
-          buffer[buffer_index] = '\0';
-          argv[argc++] = strdup(buffer);
-          buffer_index = 0;
-        }
-      } else {
-        buffer[buffer_index++] = input[i];
+          in_quotes = !in_quotes;
+      } 
+      else if (input[i] == ' ' && !in_quotes) {
+          if (buffer_index > 0) {
+              buffer[buffer_index] = '\0';
+              // 2. Prevent exceeding argv array bounds
+              if (argc < 63) {
+                  argv[argc++] = strdup(buffer);
+              }
+             buffer_index = 0;
+          }
+     } 
+      else {
+          // 3. Prevent buffer overflow (leave 1 space for '\0')
+          if (buffer_index < sizeof(buffer) - 1) {
+              buffer[buffer_index++] = input[i];
+          }
       }
-    }
-    if (buffer_index > 0) {
+  }
+
+  // Store the remaining argument if any exists
+  if (buffer_index > 0 && argc < 63) {
       buffer[buffer_index] = '\0';
       argv[argc++] = strdup(buffer);
-    }
-    argv[argc] = NULL;
+  }
+
+  argv[argc] = NULL;
+
+  
 
     // Compare input commands
     //exit
