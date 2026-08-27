@@ -21,45 +21,54 @@ int main(int argc, char *argv_main[]) {
 
     // Remove the trailing newline
     input[strcspn(input, "\n")] = '\0';
-    
-    char *argv[64];
-    int argc = 0;
 
-    char buffer[100];
+    char *argv[64];
+    int argc_count = 0;
+
+    char buffer[256];
     int buffer_index = 0;
     
-    // in_quotes will store '\'', '"', or 0 (when outside quotes)
-    char in_quotes = 0; 
+    char in_quotes = 0; // Tracks '\'', '"', or 0
+    int is_escaped = 0; // Tracks if previous char was an unquoted '\'
 
     for (int i = 0; input[i] != '\0'; i++) {
       char c = input[i];
 
-      if (in_quotes) {
-        // If we are inside a quote and match the opening quote type, close it
+      if (is_escaped) {
+        // Character following a backslash is always added literally
+        if (buffer_index < sizeof(buffer) - 1) {
+          buffer[buffer_index++] = c;
+        }
+        is_escaped = 0; // Reset escape flag
+      } 
+      else if (in_quotes) {
+        // Inside single or double quotes
         if (c == in_quotes) {
-          in_quotes = 0;
+          in_quotes = 0; // Close the quote
         } else {
-          // Add character literally (including spaces and opposite quote types)
           if (buffer_index < sizeof(buffer) - 1) {
             buffer[buffer_index++] = c;
           }
         }
-      } else {
-        // Outside of quotes
-        if (c == '\'' || c == '"') {
-          // Enter single or double quote mode
+      } 
+      else {
+        // Outside quotes and not previously escaped
+        if (c == '\\') {
+          // Enable escape flag for the NEXT character and skip adding '\'
+          is_escaped = 1;
+        } else if (c == '\'' || c == '"') {
           in_quotes = c;
         } else if (c == ' ') {
-          // Space outside quotes marks argument boundaries
+          // Unescaped space outside quotes terminates an argument
           if (buffer_index > 0) {
             buffer[buffer_index] = '\0';
-            if (argc < 63) {
-              argv[argc++] = strdup(buffer);
+            if (argc_count < 63) {
+              argv[argc_count++] = strdup(buffer);
             }
             buffer_index = 0;
           }
         } else {
-          // Normal unquoted character
+          // Regular unquoted character
           if (buffer_index < sizeof(buffer) - 1) {
             buffer[buffer_index++] = c;
           }
@@ -67,26 +76,26 @@ int main(int argc, char *argv_main[]) {
       }
     }
 
-    // Push the final argument left in the buffer
-    if (buffer_index > 0 && argc < 63) {
+    // Push final argument from buffer
+    if (buffer_index > 0 && argc_count < 63) {
       buffer[buffer_index] = '\0';
-      argv[argc++] = strdup(buffer);
+      argv[argc_count++] = strdup(buffer);
     }
-    argv[argc] = NULL;
+    argv[argc_count] = NULL;
 
     // Ignore empty lines
-    if (argc == 0) {
+    if (argc_count == 0) {
       continue;
     }
     //exit
     if (strcmp(argv[0], "exit") == 0) {
-      for (int i = 0; i < argc; i++) free(argv[i]);
+      for (int i = 0; i < argc_count; i++) free(argv[i]);
       break;
     }
     // echo
     else if (strcmp(argv[0], "echo") == 0) {
-      for (int i = 1; i < argc; i++) {
-        printf("%s%s", argv[i], (i == argc - 1) ? "" : " ");
+      for (int i = 1; i < argc_count; i++) {
+        printf("%s%s", argv[i], (i == argc_count - 1) ? "" : " ");
       }
       printf("\n");
     }
@@ -112,7 +121,7 @@ int main(int argc, char *argv_main[]) {
     // type
     else if (strcmp(argv[0], "type") == 0) {
       if (argv[1] == NULL) {
-        for (int i = 0; i < argc; i++) free(argv[i]);
+        for (int i = 0; i < argc_count ; i++) free(argv[i]);
         continue;
       }
       if (strcmp(argv[1], "exit") == 0 || strcmp(argv[1], "echo") == 0 ||
@@ -155,7 +164,7 @@ int main(int argc, char *argv_main[]) {
     }
 
     // Clean up allocated memory 
-    for (int i = 0; i < argc; i++) {
+    for (int i = 0; i < argc_count ; i++) {
       free(argv[i]);
     }
   }
