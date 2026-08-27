@@ -21,33 +21,48 @@ int main(int argc, char *argv_main[]) {
 
     // Remove the trailing newline
     input[strcspn(input, "\n")] = '\0';
-
+    
     char *argv[64];
     int argc = 0;
 
     char buffer[100];
     int buffer_index = 0;
-    int in_quotes = 0;
+    
+    // in_quotes will store '\'', '"', or 0 (when outside quotes)
+    char in_quotes = 0; 
 
     for (int i = 0; input[i] != '\0'; i++) {
-      if (input[i] == '\'') {
-        // Toggle single-quote mode without adding the quote character itself
-        in_quotes = !in_quotes;
-      } 
-      else if (input[i] == ' ' && !in_quotes) {
-        // Space outside quotes marks argument boundaries
-        if (buffer_index > 0) {
-          buffer[buffer_index] = '\0';
-          if (argc < 63) {
-            argv[argc++] = strdup(buffer);
+      char c = input[i];
+
+      if (in_quotes) {
+        // If we are inside a quote and match the opening quote type, close it
+        if (c == in_quotes) {
+          in_quotes = 0;
+        } else {
+          // Add character literally (including spaces and opposite quote types)
+          if (buffer_index < sizeof(buffer) - 1) {
+            buffer[buffer_index++] = c;
           }
-          buffer_index = 0;
         }
-      } 
-      else {
-        // Normal character (or space inside single quotes)
-        if (buffer_index < sizeof(buffer) - 1) {
-          buffer[buffer_index++] = input[i];
+      } else {
+        // Outside of quotes
+        if (c == '\'' || c == '"') {
+          // Enter single or double quote mode
+          in_quotes = c;
+        } else if (c == ' ') {
+          // Space outside quotes marks argument boundaries
+          if (buffer_index > 0) {
+            buffer[buffer_index] = '\0';
+            if (argc < 63) {
+              argv[argc++] = strdup(buffer);
+            }
+            buffer_index = 0;
+          }
+        } else {
+          // Normal unquoted character
+          if (buffer_index < sizeof(buffer) - 1) {
+            buffer[buffer_index++] = c;
+          }
         }
       }
     }
@@ -63,7 +78,7 @@ int main(int argc, char *argv_main[]) {
     if (argc == 0) {
       continue;
     }
-
+    //exit
     if (strcmp(argv[0], "exit") == 0) {
       for (int i = 0; i < argc; i++) free(argv[i]);
       break;
