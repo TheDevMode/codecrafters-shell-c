@@ -20,11 +20,25 @@ void disable_raw_mode(struct termios *orig_termios) {
   tcsetattr(STDIN_FILENO, TCSAFLUSH, orig_termios);
 }
 
-// Executes a single command (Builtin or External) inside the current process context
-void run_command(char **argv, int argc_count) {
-  if (argc_count == 0 || argv[0] == NULL) return;
+// Check if command is a builtin
+int is_builtin(const char *cmd) {
+  if (!cmd) return 0;
+  for (int i = 0; builtins[i] != NULL; i++) {
+    if (strcmp(cmd, builtins[i]) == 0) return 1;
+  }
+  return 0;
+}
 
-  // 1. Redirection handling
+// Executes a single command array. 
+// in_child = 1 means we are ALREADY inside a fork()'d child process (e.g. inside a pipe).
+// in_child = 0 means we are in the main shell process.
+void run_command(char **argv, int argc_count, int in_child) {
+  if (argc_count == 0 || argv[0] == NULL) {
+    if (in_child) exit(0);
+    return;
+  }
+
+  // Parse Redirections (>, >>, 1>, 1>>, 2>, 2>>)
   char *outfile = NULL;
   int redirect_idx = -1;
   int target_fd = STDOUT_FILENO;
@@ -81,9 +95,10 @@ void run_command(char **argv, int argc_count) {
     }
   }
 
-  // 2. Command Dispatching
+  // Execute Builtins vs External Commands
   if (strcmp(argv[0], "exit") == 0) {
-    exit(0);
+    if (in_child) exit(0);
+    else exit(0);
   } else if (strcmp(argv[0], "echo") == 0) {
     for (int i = 1; i < argc_count; i++) {
       printf("%s%s", argv[i], (i == argc_count - 1) ? "" : " ");
@@ -104,9 +119,7 @@ void run_command(char **argv, int argc_count) {
     }
   } else if (strcmp(argv[0], "type") == 0) {
     if (argv[1] != NULL) {
-      if (strcmp(argv[1], "exit") == 0 || strcmp(argv[1], "echo") == 0 ||
-          strcmp(argv[1], "pwd") == 0  || strcmp(argv[1], "cd") == 0 ||
-          strcmp(argv[1], "type") == 0) {
+      if (is_builtin(argv[1])) {
         printf("%s is a shell builtin\n", argv[1]);
       } else {
         int found = 0;
@@ -132,28 +145,37 @@ void run_command(char **argv, int argc_count) {
       }
     }
   } else {
-    // External binary command
-    execvp(argv[0], argv);
-    printf("%s: command not found\n", argv[0]);
-    exit(EXIT_FAILURE);
+    // External binary execution logic
+    if (in_child) {
+      // Already in child process (inside pipe loop), directly exec
+      execvp(argv[0], argv);
+      printf("%s: command not found\n", argv[0]);
+      exit(EXIT_FAILURE);
+    } else {
+      // Main shell process - must fork first
+      pid_t pid = fork();
+      if (pid == 0) {
+        execvp(argv[0], argv);
+        printf("%s: command not found\n", argv[0]);
+        exit(EXIT_FAILURE);
+      } else if (pid > 0) {
+        waitpid(pid, NULL, 0);
+      }
+    }
   }
 
-  // Restore file descriptor if needed
+  // Clean up and restore standard descriptors
   if (outfile != NULL && saved_fd != -1) {
     if (target_fd == STDOUT_FILENO) fflush(stdout);
     else fflush(stderr);
     dup2(saved_fd, target_fd);
     close(saved_fd);
   }
-}
 
-// Check if a command name is a shell builtin
-int is_builtin(const char *cmd) {
-  if (!cmd) return 0;
-  for (int i = 0; builtins[i] != NULL; i++) {
-    if (strcmp(cmd, builtins[i]) == 0) return 1;
+  // If running inside a pipe child process, terminate upon completion
+  if (in_child) {
+    exit(0);
   }
-  return 0;
 }
 
 int main(int argc, char *argv_main[]) {
@@ -161,6 +183,7 @@ int main(int argc, char *argv_main[]) {
   struct termios orig_termios;
 
   while (1) {
+    // Always print prompt at top of loop
     printf("$ ");
     fflush(stdout);
 
@@ -277,7 +300,7 @@ int main(int argc, char *argv_main[]) {
 
     int total_allocated = argc_count;
 
-    // Check for Pipeline '|'
+    // Pipeline Check
     int pipe_idx = -1;
     for (int i = 0; i < argc_count; i++) {
       if (strcmp(argv[i], "|") == 0) {
@@ -287,7 +310,6 @@ int main(int argc, char *argv_main[]) {
     }
 
     if (pipe_idx != -1) {
-      // Split commands around pipe
       argv[pipe_idx] = NULL;
       char **cmd1_argv = &argv[0];
       int cmd1_argc = pipe_idx;
@@ -302,29 +324,27 @@ int main(int argc, char *argv_main[]) {
         continue;
       }
 
-      // Child 1 (Left side of pipe)
       pid_t pid1 = fork();
       if (pid1 == 0) {
         dup2(pipefd[1], STDOUT_FILENO);
         close(pipefd[0]);
         close(pipefd[1]);
 
-        run_command(cmd1_argv, cmd1_argc);
-        exit(0); // Ensure child exits after running builtin or command
+        // Run as child process (in_child = 1)
+        run_command(cmd1_argv, cmd1_argc, 1);
       }
 
-      // Child 2 (Right side of pipe)
       pid_t pid2 = fork();
       if (pid2 == 0) {
         dup2(pipefd[0], STDIN_FILENO);
         close(pipefd[0]);
         close(pipefd[1]);
 
-        run_command(cmd2_argv, cmd2_argc);
-        exit(0); // Ensure child exits after running builtin or command
+        // Run as child process (in_child = 1)
+        run_command(cmd2_argv, cmd2_argc, 1);
       }
 
-      // Parent Process
+      // Close parent descriptors and wait for completion
       close(pipefd[0]);
       close(pipefd[1]);
 
@@ -332,22 +352,11 @@ int main(int argc, char *argv_main[]) {
       waitpid(pid2, NULL, 0);
 
     } else {
-      // Non-piped execution
-      if (strcmp(argv[0], "cd") == 0 || strcmp(argv[0], "exit") == 0) {
-        // Run state-altering builtins in the main process context
-        if (strcmp(argv[0], "exit") == 0) {
-          for (int i = 0; i < total_allocated; i++) free(argv[i]);
-          exit(0);
-        } else {
-          run_command(argv, argc_count);
-        }
-      } else {
-        // Run other commands or external binaries
-        run_command(argv, argc_count);
-      }
+      // Normal single command execution (in_child = 0)
+      run_command(argv, argc_count, 0);
     }
 
-    // Free memory
+    // Free string memory
     for (int i = 0; i < total_allocated; i++) {
       free(argv[i]);
     }
