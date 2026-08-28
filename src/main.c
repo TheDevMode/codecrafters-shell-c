@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 int main(int argc, char *argv_main[]) {
   // Flush after every printf
@@ -101,6 +102,43 @@ char *argv[64];
     if (argc_count == 0) {
       continue;
     }
+
+    //> redirection
+    char *outfile = NULL;
+    int redirect_idx = -1;
+
+    for (int i = 0; i < argc_count; i++) {
+      if (strcmp(argv[i], ">") == 0 || strcmp(argv[i], "1>") == 0) {
+        if (i + 1 < argc_count) {
+          outfile = argv[i + 1];
+          redirect_idx = i;
+          break;
+        }
+      }
+    }
+
+    // Truncate argv at '>' so builtins/execvp don't see redirection tokens
+    if (redirect_idx != -1) {
+      argv[redirect_idx] = NULL;
+      argc_count = redirect_idx;
+    }
+
+    // Backup stdout so we can restore it after builtins execute
+    int saved_stdout = dup(STDOUT_FILENO);
+    int fd_out = -1;
+
+    if (outfile != NULL) {
+      fd_out = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+      if (fd_out < 0) {
+        perror("open");
+        for (int i = 0; i < argc_count; i++) free(argv[i]);
+        close(saved_stdout);
+        continue;
+      }
+      dup2(fd_out, STDOUT_FILENO);
+      close(fd_out);
+    }
+
     //exit
     if (strcmp(argv[0], "exit") == 0) {
       for (int i = 0; i < argc_count; i++) free(argv[i]);
