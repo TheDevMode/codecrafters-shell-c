@@ -21,8 +21,7 @@ int main(int argc, char *argv_main[]) {
 
     // Remove the trailing newline
     input[strcspn(input, "\n")] = '\0';
-
-    char *argv[64];
+char *argv[64];
     int argc_count = 0;
 
     char buffer[256];
@@ -35,31 +34,47 @@ int main(int argc, char *argv_main[]) {
       char c = input[i];
 
       if (is_escaped) {
-        // Character following a backslash is always added literally
+        // Unquoted backslash: always add next char literally
         if (buffer_index < sizeof(buffer) - 1) {
           buffer[buffer_index++] = c;
         }
-        is_escaped = 0; // Reset escape flag
+        is_escaped = 0;
       } 
       else if (in_quotes) {
-        // Inside single or double quotes
         if (c == in_quotes) {
-          in_quotes = 0; // Close the quote
-        } else {
+          // Closing matching quote
+          in_quotes = 0;
+        } 
+        else if (in_quotes == '"' && c == '\\') {
+          // Inside double quotes: check the NEXT character
+          char next = input[i + 1];
+          if (next == '"' || next == '\\') {
+            // Escaped special char: skip the '\' and output the next char
+            if (buffer_index < sizeof(buffer) - 1) {
+              buffer[buffer_index++] = next;
+            }
+            i++; // Skip the escaped character in loop
+          } else {
+            // Unescaped char: preserve the '\' literally
+            if (buffer_index < sizeof(buffer) - 1) {
+              buffer[buffer_index++] = c;
+            }
+          }
+        } 
+        else {
+          // Inside single quotes or regular char inside double quotes
           if (buffer_index < sizeof(buffer) - 1) {
             buffer[buffer_index++] = c;
           }
         }
       } 
       else {
-        // Outside quotes and not previously escaped
+        // Outside quotes
         if (c == '\\') {
-          // Enable escape flag for the NEXT character and skip adding '\'
           is_escaped = 1;
         } else if (c == '\'' || c == '"') {
           in_quotes = c;
         } else if (c == ' ') {
-          // Unescaped space outside quotes terminates an argument
           if (buffer_index > 0) {
             buffer[buffer_index] = '\0';
             if (argc_count < 63) {
@@ -68,7 +83,6 @@ int main(int argc, char *argv_main[]) {
             buffer_index = 0;
           }
         } else {
-          // Regular unquoted character
           if (buffer_index < sizeof(buffer) - 1) {
             buffer[buffer_index++] = c;
           }
