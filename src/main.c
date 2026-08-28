@@ -119,10 +119,9 @@ char *argv[64];
 
     // Truncate argv at '>' so builtins/execvp don't see redirection tokens
     if (redirect_idx != -1) {
-      argv[redirect_idx] = NULL;
-      argc_count = redirect_idx;
-    }
-
+    argv[redirect_idx] = NULL;
+    argc_count = redirect_idx;
+}
     // Backup stdout so we can restore it after builtins execute
     int saved_stdout = dup(STDOUT_FILENO);
     int fd_out = -1;
