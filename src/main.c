@@ -22,20 +22,20 @@ int main(int argc, char *argv_main[]) {
 
     // Remove the trailing newline
     input[strcspn(input, "\n")] = '\0';
-char *argv[64];
+    
+    char *argv[64];
     int argc_count = 0;
 
     char buffer[256];
     int buffer_index = 0;
     
-    char in_quotes = 0; // Tracks '\'', '"', or 0
-    int is_escaped = 0; // Tracks if previous char was an unquoted '\'
+    char in_quotes = 0; 
+    int is_escaped = 0; 
 
     for (int i = 0; input[i] != '\0'; i++) {
       char c = input[i];
 
       if (is_escaped) {
-        // Unquoted backslash: always add next char literally
         if (buffer_index < sizeof(buffer) - 1) {
           buffer[buffer_index++] = c;
         }
@@ -43,34 +43,28 @@ char *argv[64];
       } 
       else if (in_quotes) {
         if (c == in_quotes) {
-          // Closing matching quote
           in_quotes = 0;
         } 
         else if (in_quotes == '"' && c == '\\') {
-          // Inside double quotes: check the NEXT character
           char next = input[i + 1];
           if (next == '"' || next == '\\') {
-            // Escaped special char: skip the '\' and output the next char
             if (buffer_index < sizeof(buffer) - 1) {
               buffer[buffer_index++] = next;
             }
-            i++; // Skip the escaped character in loop
+            i++;
           } else {
-            // Unescaped char: preserve the '\' literally
             if (buffer_index < sizeof(buffer) - 1) {
               buffer[buffer_index++] = c;
             }
           }
         } 
         else {
-          // Inside single quotes or regular char inside double quotes
           if (buffer_index < sizeof(buffer) - 1) {
             buffer[buffer_index++] = c;
           }
         }
       } 
       else {
-        // Outside quotes
         if (c == '\\') {
           is_escaped = 1;
         } else if (c == '\'' || c == '"') {
@@ -91,19 +85,21 @@ char *argv[64];
       }
     }
 
-    // Push final argument from buffer
     if (buffer_index > 0 && argc_count < 63) {
       buffer[buffer_index] = '\0';
       argv[argc_count++] = strdup(buffer);
     }
     argv[argc_count] = NULL;
 
-    // Ignore empty lines
     if (argc_count == 0) {
       continue;
     }
 
-    //> redirection
+    int total_allocated = argc_count; // Keep track of all allocated strings for freeing
+
+    // =========================================================
+    // 2. CHECK FOR OUTPUT REDIRECTION (> OR 1>)
+    // =========================================================
     char *outfile = NULL;
     int redirect_idx = -1;
 
@@ -117,25 +113,20 @@ char *argv[64];
       }
     }
 
-    // Truncate argv at '>' so builtins/execvp don't see redirection tokens
+    // Truncate argv for command execution
     if (redirect_idx != -1) {
-    argv[redirect_idx] = NULL;
-    argc_count = redirect_idx;
-}
-    // Backup stdout so we can restore it after builtins execute
+      argv[redirect_idx] = NULL;
+      argc_count = redirect_idx;
+    }
+
     int saved_stdout = dup(STDOUT_FILENO);
-    int fd_out = -1;
 
     if (outfile != NULL) {
-      fd_out = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-      if (fd_out < 0) {
-        perror("open");
-        for (int i = 0; i < argc_count; i++) free(argv[i]);
-        close(saved_stdout);
-        continue;
+      int fd_out = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+      if (fd_out >= 0) {
+        dup2(fd_out, STDOUT_FILENO);
+        close(fd_out);
       }
-      dup2(fd_out, STDOUT_FILENO);
-      close(fd_out);
     }
 
     //exit
