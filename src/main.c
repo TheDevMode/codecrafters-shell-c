@@ -96,12 +96,21 @@ int main(int argc, char *argv_main[]) {
 
     char *outfile = NULL;
     int redirect_idx = -1;
+    int target_fd = STDOUT_FILENO; // Default to stdout
 
     for (int i = 0; i < argc_count; i++) {
       if (strcmp(argv[i], ">") == 0 || strcmp(argv[i], "1>") == 0) {
         if (i + 1 < argc_count) {
           outfile = argv[i + 1];
           redirect_idx = i;
+          target_fd = STDOUT_FILENO;
+          break;
+        }
+      } else if (strcmp(argv[i], "2>") == 0) {
+        if (i + 1 < argc_count) {
+          outfile = argv[i + 1];
+          redirect_idx = i;
+          target_fd = STDERR_FILENO;
           break;
         }
       }
@@ -112,12 +121,13 @@ int main(int argc, char *argv_main[]) {
       argc_count = redirect_idx;
     }
 
-    int saved_stdout = dup(STDOUT_FILENO);
+    int saved_fd = -1;
 
     if (outfile != NULL) {
+      saved_fd = dup(target_fd);
       int fd_out = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
       if (fd_out >= 0) {
-        dup2(fd_out, STDOUT_FILENO);
+        dup2(fd_out, target_fd);
         close(fd_out);
       }
     }
@@ -126,8 +136,8 @@ int main(int argc, char *argv_main[]) {
       // exit
       if (strcmp(argv[0], "exit") == 0) {
         for (int i = 0; i < total_allocated; i++) free(argv[i]);
-        dup2(saved_stdout, STDOUT_FILENO);
-        close(saved_stdout);
+        dup2(saved_fd, target_fd);
+        close(saved_fd);
         break;
       }
       // echo
@@ -205,8 +215,8 @@ int main(int argc, char *argv_main[]) {
 
     // Flush and restore standard stdout
     fflush(stdout);
-    dup2(saved_stdout, STDOUT_FILENO);
-    close(saved_stdout);
+    dup2(saved_fd, target_fd);
+    close(saved_fd);
 
     // Free memory
     for (int i = 0; i < total_allocated; i++) {
