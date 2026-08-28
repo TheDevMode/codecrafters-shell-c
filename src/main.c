@@ -96,36 +96,64 @@ int main(int argc, char *argv_main[]) {
 
     char *outfile = NULL;
     int redirect_idx = -1;
-    int target_fd = STDOUT_FILENO; // Default to stdout
+    int target_fd = STDOUT_FILENO;
+    int open_flags = O_WRONLY | O_CREAT; 
 
     for (int i = 0; i < argc_count; i++) {
-      if (strcmp(argv[i], ">") == 0 || strcmp(argv[i], "1>") == 0) {
-        if (i + 1 < argc_count) {
-          outfile = argv[i + 1];
-          redirect_idx = i;
-          target_fd = STDOUT_FILENO;
-          break;
-        }
-      } else if (strcmp(argv[i], "2>") == 0) {
-        if (i + 1 < argc_count) {
-          outfile = argv[i + 1];
-          redirect_idx = i;
-          target_fd = STDERR_FILENO;
-          break;
-        }
+    // Standard output overwrite
+    if (strcmp(argv[i], ">") == 0 || strcmp(argv[i], "1>") == 0) {
+      if (i + 1 < argc_count) {
+        outfile = argv[i + 1];
+        redirect_idx = i;
+        target_fd = STDOUT_FILENO;
+        open_flags |= O_TRUNC;
+        break;
+      }
+    } 
+    // Standard output append
+    else if (strcmp(argv[i], ">>") == 0 || strcmp(argv[i], "1>>") == 0) {
+      if (i + 1 < argc_count) {
+        outfile = argv[i + 1];
+        redirect_idx = i;
+        target_fd = STDOUT_FILENO;
+        open_flags |= O_APPEND;
+        break;
+      }
+    } 
+    // Standard error overwrite
+    else if (strcmp(argv[i], "2>") == 0) {
+      if (i + 1 < argc_count) {
+        outfile = argv[i + 1];
+       redirect_idx = i;
+       target_fd = STDERR_FILENO;
+       open_flags |= O_TRUNC;
+       break;
+      }
+    } 
+    // Standard error append
+    else if (strcmp(argv[i], "2>>") == 0) {
+     if (i + 1 < argc_count) {
+      outfile = argv[i + 1];
+       redirect_idx = i;
+       target_fd = STDERR_FILENO;
+        open_flags |= O_APPEND;
+       break;
       }
     }
+  }
 
-    if (redirect_idx != -1) {
-      argv[redirect_idx] = NULL;
-      argc_count = redirect_idx;
-    }
+  if (redirect_idx != -1) {
+    argv[redirect_idx] = NULL;
+    argc_count = redirect_idx;
+  }
+
+  
 
     int saved_fd = -1;
 
     if (outfile != NULL) {
       saved_fd = dup(target_fd);
-      int fd_out = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+      int fd_out = open(outfile, open_flags, 0644);
       if (fd_out >= 0) {
         dup2(fd_out, target_fd);
         close(fd_out);
