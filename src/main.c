@@ -20,7 +20,6 @@ void disable_raw_mode(struct termios *orig_termios) {
   tcsetattr(STDIN_FILENO, TCSAFLUSH, orig_termios);
 }
 
-// Check if command is a builtin
 int is_builtin(const char *cmd) {
   if (!cmd) return 0;
   for (int i = 0; builtins[i] != NULL; i++) {
@@ -30,8 +29,8 @@ int is_builtin(const char *cmd) {
 }
 
 // Executes a single command array. 
-// in_child = 1 means we are ALREADY inside a fork()'d child process (e.g. inside a pipe).
-// in_child = 0 means we are in the main shell process.
+// in_child = 1 when running inside a fork()'d pipeline stage child process.
+// in_child = 0 when running directly from the main shell loop.
 void run_command(char **argv, int argc_count, int in_child) {
   if (argc_count == 0 || argv[0] == NULL) {
     if (in_child) exit(0);
@@ -95,10 +94,9 @@ void run_command(char **argv, int argc_count, int in_child) {
     }
   }
 
-  // Execute Builtins vs External Commands
+  // Builtins vs External Commands Dispatching
   if (strcmp(argv[0], "exit") == 0) {
-    if (in_child) exit(0);
-    else exit(0);
+    exit(0);
   } else if (strcmp(argv[0], "echo") == 0) {
     for (int i = 1; i < argc_count; i++) {
       printf("%s%s", argv[i], (i == argc_count - 1) ? "" : " ");
@@ -145,14 +143,12 @@ void run_command(char **argv, int argc_count, int in_child) {
       }
     }
   } else {
-    // External binary execution logic
+    // External command execution logic
     if (in_child) {
-      // Already in child process (inside pipe loop), directly exec
       execvp(argv[0], argv);
       printf("%s: command not found\n", argv[0]);
       exit(EXIT_FAILURE);
     } else {
-      // Main shell process - must fork first
       pid_t pid = fork();
       if (pid == 0) {
         execvp(argv[0], argv);
@@ -164,7 +160,7 @@ void run_command(char **argv, int argc_count, int in_child) {
     }
   }
 
-  // Clean up and restore standard descriptors
+  // Clean up standard descriptors if redirected
   if (outfile != NULL && saved_fd != -1) {
     if (target_fd == STDOUT_FILENO) fflush(stdout);
     else fflush(stderr);
@@ -172,7 +168,6 @@ void run_command(char **argv, int argc_count, int in_child) {
     close(saved_fd);
   }
 
-  // If running inside a pipe child process, terminate upon completion
   if (in_child) {
     exit(0);
   }
@@ -183,7 +178,6 @@ int main(int argc, char *argv_main[]) {
   struct termios orig_termios;
 
   while (1) {
-    // Always print prompt at top of loop
     printf("$ ");
     fflush(stdout);
 
@@ -245,7 +239,7 @@ int main(int argc, char *argv_main[]) {
 
     if (input_len == 0) continue;
 
-    // Tokenize Input
+    // Command Tokenization
     char *argv[128];
     int argc_count = 0;
     char buffer[512];
@@ -300,63 +294,94 @@ int main(int argc, char *argv_main[]) {
 
     int total_allocated = argc_count;
 
-    // Pipeline Check
-    int pipe_idx = -1;
+    // Split tokens into individual sub-command arrays separated by '|'
+    char **cmds[64];
+    int cmds_argc[64];
+    int num_cmds = 0;
+
+    cmds[num_cmds] = &argv[0];
+    int current_cmd_argc = 0;
+
     for (int i = 0; i < argc_count; i++) {
       if (strcmp(argv[i], "|") == 0) {
-        pipe_idx = i;
-        break;
+        argv[i] = NULL; // Replace '|' with NULL to terminate previous command slice
+        cmds_argc[num_cmds] = current_cmd_argc;
+        num_cmds++;
+        cmds[num_cmds] = &argv[i + 1];
+        current_cmd_argc = 0;
+      } else {
+        current_cmd_argc++;
       }
     }
+    cmds_argc[num_cmds] = current_cmd_argc;
+    num_cmds++;
 
-    if (pipe_idx != -1) {
-      argv[pipe_idx] = NULL;
-      char **cmd1_argv = &argv[0];
-      int cmd1_argc = pipe_idx;
+    if (num_cmds > 1) {
+      // Execute multi-stage pipeline across N commands
+      int prev_pipe_read = -1;
+      pid_t pids[64];
 
-      char **cmd2_argv = &argv[pipe_idx + 1];
-      int cmd2_argc = argc_count - (pipe_idx + 1);
+      for (int i = 0; i < num_cmds; i++) {
+        int pipefd[2];
+        if (i < num_cmds - 1) {
+          if (pipe(pipefd) == -1) {
+            perror("pipe");
+            break;
+          }
+        }
 
-      int pipefd[2];
-      if (pipe(pipefd) == -1) {
-        perror("pipe");
-        for (int i = 0; i < total_allocated; i++) free(argv[i]);
-        continue;
+        pid_t pid = fork();
+        if (pid == 0) {
+          // Connect STDIN from previous stage pipe
+          if (prev_pipe_read != -1) {
+            dup2(prev_pipe_read, STDIN_FILENO);
+            close(prev_pipe_read);
+          }
+
+          // Connect STDOUT to next stage pipe
+          if (i < num_cmds - 1) {
+            close(pipefd[0]);
+            dup2(pipefd[1], STDOUT_FILENO);
+            close(pipefd[1]);
+          }
+
+          run_command(cmds[i], cmds_argc[i], 1);
+        }
+
+        pids[i] = pid;
+
+        // Close parent pipe descriptors
+        if (prev_pipe_read != -1) {
+          close(prev_pipe_read);
+        }
+        if (i < num_cmds - 1) {
+          close(pipefd[1]);
+          prev_pipe_read = pipefd[0];
+        }
       }
 
-      pid_t pid1 = fork();
-      if (pid1 == 0) {
-        dup2(pipefd[1], STDOUT_FILENO);
-        close(pipefd[0]);
-        close(pipefd[1]);
-
-        // Run as child process (in_child = 1)
-        run_command(cmd1_argv, cmd1_argc, 1);
+      // Wait for all child stages to complete
+      for (int i = 0; i < num_cmds; i++) {
+        if (pids[i] > 0) {
+          waitpid(pids[i], NULL, 0);
+        }
       }
-
-      pid_t pid2 = fork();
-      if (pid2 == 0) {
-        dup2(pipefd[0], STDIN_FILENO);
-        close(pipefd[0]);
-        close(pipefd[1]);
-
-        // Run as child process (in_child = 1)
-        run_command(cmd2_argv, cmd2_argc, 1);
-      }
-
-      // Close parent descriptors and wait for completion
-      close(pipefd[0]);
-      close(pipefd[1]);
-
-      waitpid(pid1, NULL, 0);
-      waitpid(pid2, NULL, 0);
 
     } else {
-      // Normal single command execution (in_child = 0)
-      run_command(argv, argc_count, 0);
+      // Single command execution
+      if (strcmp(argv[0], "cd") == 0 || strcmp(argv[0], "exit") == 0) {
+        if (strcmp(argv[0], "exit") == 0) {
+          for (int i = 0; i < total_allocated; i++) free(argv[i]);
+          exit(0);
+        } else {
+          run_command(argv, argc_count, 0);
+        }
+      } else {
+        run_command(argv, argc_count, 0);
+      }
     }
 
-    // Free string memory
+    // Free heap memory for tokenized string args
     for (int i = 0; i < total_allocated; i++) {
       free(argv[i]);
     }
